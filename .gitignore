@@ -1,0 +1,14 @@
+# Node
+node_modules/
+server/uploads/
+*.env
+
+# Python
+ml_service/venv/
+ml_service/__pycache__/
+ml_service/models/saved/*.pkl
+ml_service/data/raw/*.csv
+*.pyc
+
+# Misc
+.DS_Store
