@@ -1,18 +1,73 @@
-const multer = require('multer');
-const path = require('path');
+import multer from 'multer';
+
+import path from 'path';
+
+
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, './server/uploads'),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+
+    destination: (req, file, cb) => {
+
+        cb(null, 'uploads/');
+
+    },
+
+   filename: (req, file, cb) => {
+
+    const sanitizedName = file.originalname
+        .replace(/\s+/g, '-')
+        .replace(/[^a-zA-Z0-9.-]/g, '');
+
+    cb(
+        null,
+        `${Date.now()}-${sanitizedName}`
+    );
+
+}
+
 });
+
+
 
 const fileFilter = (req, file, cb) => {
-  const ext = path.extname(file.originalname).toLowerCase();
-  cb(null, ext === '.pdf');
+
+    const allowedExtensions = /pdf|doc|docx|tex|txt/;
+
+    const extensionValid = allowedExtensions.test(
+        file.originalname.toLowerCase()
+    );
+
+    if (extensionValid) {
+
+        cb(null, true);
+
+    }
+    else {
+
+        cb(
+            new Error(
+                'Only PDF, DOC, DOCX, TEX, and TXT files are allowed'
+            )
+        );
+
+    }
+
 };
 
-module.exports = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 },
+
+
+const upload = multer({
+
+    storage,
+
+    fileFilter,
+
+    limits: {
+        fileSize: 5 * 1024 * 1024
+    }
+
 });
+
+
+
+export default upload;
