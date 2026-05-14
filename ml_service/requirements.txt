@@ -1,12 +1,13 @@
 fastapi
 uvicorn
-scikit-learn
-pandas
+python-multipart
 pdfplumber
 spacy
-python-multipart
-joblib
+scikit-learn
+pandas
 numpy
+joblib
 requests
 beautifulsoup4
 lxml
+python-docx
