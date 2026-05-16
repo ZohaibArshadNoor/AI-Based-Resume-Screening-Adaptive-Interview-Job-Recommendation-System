@@ -72,4 +72,4 @@ def extract_name(text):
         ):
             return cleaned
 
-    return None 
+    return None

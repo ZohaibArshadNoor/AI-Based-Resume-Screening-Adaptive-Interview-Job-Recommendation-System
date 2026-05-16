@@ -1,6 +1,7 @@
 # Node
 node_modules/
 server/uploads/
+md_files/
 *.env
 
 # Python
