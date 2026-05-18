@@ -134,6 +134,7 @@ export default function AgentInterview() {
 
   // ── ATS Score ─────────────────────────────────────────────────────────────
   const fetchAtsScore = async () => {
+<<<<<<< HEAD:client/src/pages/AgentInterview.jsx
   setStage(STAGES.SCORING);
   const msgs = [
     'Analyzing your interview performance...',
@@ -157,6 +158,28 @@ export default function AgentInterview() {
     console.error('ATS Score error:', err.response?.data || err.message);
   }
 };
+=======
+    setStage(STAGES.SCORING);
+    const msgs = [
+      'Analyzing your interview performance...',
+      'Matching skills against job requirements...',
+      'Evaluating technical responses...',
+      'Generating your ATS report...',
+    ];
+    let i = 0;
+    const iv = setInterval(() => setScoringMsg(msgs[Math.min(i++, msgs.length - 1)]), 2500);
+
+    try {
+      const res = await api.post('/agent/ats-score', { sessionId });
+      clearInterval(iv);
+      setAtsReport(res.data);
+      setStage(STAGES.RESULTS);
+    } catch {
+      clearInterval(iv);
+      setScoringMsg('Scoring failed. Please try again.');
+    }
+  };
+>>>>>>> ML-Infrastructure-Setup:frontend/src/pages/AgentInterview.jsx
 
   const resetAll = () => {
     setStage(STAGES.SETUP);
