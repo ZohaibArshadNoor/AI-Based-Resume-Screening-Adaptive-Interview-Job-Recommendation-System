@@ -169,6 +169,65 @@ async def match_job(
             "error": str(error)
         }
         
+@app.post("/predict-role")
+async def predict_role(
+
+    role: str = Form(...),
+
+    file: UploadFile = File(...)
+
+):
+
+    try:
+
+        temp_path = save_file(file)
+
+        extracted_text = extract_text(temp_path)
+
+        os.remove(temp_path)
+
+        transformed_text = tfidf_vectorizer.transform(
+            [extracted_text]
+        )
+
+        prediction = classifier_model.predict(
+            transformed_text
+        )[0]
+
+        probabilities = classifier_model.predict_proba(
+            transformed_text
+        )[0]
+
+        confidence = float(max(probabilities))
+
+        role_match = (
+            role.lower().strip()
+            ==
+            prediction.lower().strip()
+        )
+
+        return {
+
+            "file_name": file.filename,
+
+            "selected_role": role,
+
+            "predicted_role": prediction,
+
+            "match": role_match,
+
+            "confidence": round(
+                confidence * 100,
+                2
+            )
+        }
+
+    except Exception as error:
+
+        return {
+            "error": str(error)
+        }        
+
         
 # ── Agent: Chat Turn ──────────────────────────────────────────────────────────
 @app.post("/agent/chat")
