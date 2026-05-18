@@ -15,8 +15,10 @@ from services.resume_parser import (
 )
 
 from services.skill_extractor import SkillExtractor
-
 from services.skill_matcher import SkillMatcher
+
+from services.job_agent import run_job_agent
+from pydantic import BaseModel
 
 import json
 from services.groq_agent import chat_with_agent, generate_ats_score
@@ -300,3 +302,35 @@ async def agent_ats_score(
         import traceback
         traceback.print_exc()           # ← prints full error in uvicorn terminal
         return {"error": str(e)}
+    
+    
+# ──────────────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────Agent: Job Search────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────────────
+
+class JobSearchRequest(BaseModel):
+    job_role: str
+    job_description: str
+    user_skills: list[str] = []
+    max_results: int = 6
+    use_mock: bool = False
+
+
+@app.post("/find-jobs")
+async def find_jobs(req: JobSearchRequest):
+    """
+    Gemini agent endpoint.
+    Accepts a job role + description, returns ranked similar job listings.
+    """
+    try:
+        jobs = run_job_agent(
+            job_role=req.job_role,
+            job_description=req.job_description,
+            user_skills=req.user_skills,
+            max_results=req.max_results,
+            use_mock=req.use_mock,
+        )
+        return {"status": "success", "count": len(jobs), "jobs": jobs}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "jobs": []}
+    

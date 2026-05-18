@@ -8,6 +8,7 @@ const CARDS = [
     { title: 'Job Matches',        desc: 'Find jobs that match your skill profile',             path: '/jobs',      emoji: '💼', color: 'green'  },
     { title: 'My Results',         desc: 'View your scores and session history',                path: '/results',   emoji: '📊', color: 'orange' },
     { title: 'AI Mock Interview', desc: 'Real interview simulation with ATS scoring powered by Groq AI', path: '/agent-interview', emoji: '🤖', color: 'indigo' },
+    { label: 'Find Jobs',         path: '/jobs',      color: 'bg-green-500' },  // ← NEW
 ];
 
 const COLOR_MAP = {

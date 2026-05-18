@@ -17,6 +17,8 @@ app.use(express.json());
 app.use('/api/auth',   authRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/agent',  agentRoutes);
+app.use('/api/jobs', require('./routes/jobRoutes'));
+
 
 app.get('/', (_, res) => res.send('API Running'));
 

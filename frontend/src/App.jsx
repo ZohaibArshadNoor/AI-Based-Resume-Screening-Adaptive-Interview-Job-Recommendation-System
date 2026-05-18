@@ -1,4 +1,5 @@
 import axios from 'axios';
+import JobRecommendations from './pages/JobRecommendations';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
@@ -21,5 +22,24 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route
+          path="/jobs"
+          element={
+            <ProtectedRoute>
+              <JobRecommendations />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
 
 export default api;
