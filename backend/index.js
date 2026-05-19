@@ -5,6 +5,8 @@ import connectDB  from './config/db.js';
 import authRoutes   from './routes/authRoutes.js';
 import resumeRoutes from './routes/resumeRoutes.js';
 import agentRoutes  from './routes/agentRoutes.js';
+import predictRoutes from './routes/predictRoutes.js';
+import dashboardRoutes from "./routes/dashboardRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -17,6 +19,8 @@ app.use(express.json());
 app.use('/api/auth',   authRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/agent',  agentRoutes);
+app.use('/api/predict', predictRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 app.get('/', (_, res) => res.send('API Running'));
 
