@@ -1,243 +1,83 @@
-import os
-import json
-import google.generativeai as genai
-from services.job_scraper import scrape_all
-from dotenv import load_dotenv
+"""
+job_agent.py
+------------
+Main orchestrator for the job recommendation pipeline.
 
-load_dotenv()
+Flow:
+  1. query_builder.py  → Gemini reads role+description → generates portal-specific search queries
+  2. scrapers.py       → Runs LinkedIn, Rozee.pk, Indeed scrapers in sequence → real job URLs
+  3. ranker.py         → Gemini (or TF-IDF fallback) ranks jobs by relevance → top N returned
 
-# Configure Gemini
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+This is the ONLY file you need to import in app.py.
+Call: run_job_agent(job_role, job_description, max_results=8)
+"""
 
-
-# ── TOOL DEFINITION ──────────────────────────────────────────────────────────
-# This is the function Gemini will call as a tool
-def scrape_jobs_tool(search_query: str) -> str:
-    """
-    Scrape job listings from the web based on a search query.
-    Returns a JSON string of job listings.
-    """
-    jobs = scrape_all(search_query, use_mock=False)
-    return json.dumps(jobs)
+from services.query_builder import build_search_queries
+from services.scrapers import scrape_all_portals
+from services.ranker import rank_with_gemini
 
 
-# Tool schema for Gemini function calling
-TOOLS = [
-    {
-        "function_declarations": [
-            {
-                "name": "scrape_jobs_tool",
-                "description": (
-                    "Search and scrape live job listings from job portals "
-                    "(LinkedIn, Indeed, Rozee.pk) using the given search query. "
-                    "Call this to find real job postings matching a role or skills."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "search_query": {
-                            "type": "string",
-                            "description": "Search query to find relevant job listings. E.g. 'Python developer Karachi'",
-                        }
-                    },
-                    "required": ["search_query"],
-                },
-            }
-        ]
-    }
-]
-
-# Map tool name to actual Python function
-TOOL_FUNCTIONS = {
-    "scrape_jobs_tool": scrape_jobs_tool,
-}
-
-
-# ── MAIN AGENT FUNCTION ───────────────────────────────────────────────────────
 def run_job_agent(
     job_role: str,
     job_description: str,
     user_skills: list[str] | None = None,
-    max_results: int = 6,
-    use_mock: bool = False,
+    max_results: int = 8,
 ) -> list[dict]:
     """
-    Run the Gemini agent to find jobs matching the given role and description.
+    Full pipeline: role + description → ranked real job listings with direct URLs.
 
     Args:
-        job_role: e.g. "Software Engineer"
-        job_description: the job description the user is applying for / interested in
-        user_skills: optional list of user's skills from resume
-        max_results: how many jobs to return
-        use_mock: if True, skips real scraping (for demo / testing)
+        job_role:        e.g. "Backend Software Engineer"
+        job_description: Full text of the job ad the candidate is applying for
+        user_skills:     Optional list from resume (not used in search, logged only)
+        max_results:     How many ranked jobs to return (default 8)
 
     Returns:
-        List of ranked job dicts with keys:
-        title, company, location, url, source, description_snippet, relevance_score, reason
+        List of dicts, each containing:
+          title            str   — Job title
+          company          str   — Company name
+          location         str   — City / country
+          url              str   — DIRECT link to the job posting (not homepage)
+          source           str   — "LinkedIn" | "Rozee.pk" | "Indeed"
+          posted_date      str   — When posted (if available)
+          description_snippet str — Short text from the listing
+          relevance_score  int   — 0-100 match score vs your job description
+          reason           str   — 1-sentence explanation from Gemini
     """
+    print(f"\n{'='*60}")
+    print(f"[Agent] Starting job search")
+    print(f"[Agent] Role: {job_role}")
+    print(f"[Agent] Skills: {user_skills}")
+    print(f"{'='*60}\n")
 
-    # If mock mode, bypass Gemini and return filtered mock data
-    if use_mock:
-        from services.job_scraper import MOCK_JOBS
-        return _format_mock_results(MOCK_JOBS, max_results)
+    # ── STEP 1: Build smart search queries ───────────────────────────────────
+    print("[Agent] Step 1: Building search queries via Gemini...")
+    queries = build_search_queries(job_role, job_description)
+    print(f"[Agent] Queries → {queries}")
 
-    skills_text = ", ".join(user_skills) if user_skills else "not specified"
+    # ── STEP 2: Scrape all portals ────────────────────────────────────────────
+    print("\n[Agent] Step 2: Scraping job portals...")
+    raw_jobs = scrape_all_portals(queries, max_per_source=max(max_results, 8))
+    print(f"[Agent] Raw jobs collected: {len(raw_jobs)}")
 
-    # System prompt — gives Gemini its identity and task
-    system_prompt = f"""
-You are a job recommendation agent. Your job is to find the most relevant job listings
-for a candidate based on their target job role and a reference job description.
+    if not raw_jobs:
+        print("[Agent] WARNING: No jobs scraped from any portal.")
+        return []
 
-Candidate details:
-- Target role: {job_role}
-- Known skills: {skills_text}
-
-Your workflow:
-1. Analyze the job description to extract 3-5 core skills and responsibilities.
-2. Generate 2-3 smart search queries targeting different aspects of the role.
-3. Call the scrape_jobs_tool for each query to collect listings.
-4. Evaluate ALL collected listings against the reference job description.
-5. Return ONLY the top {max_results} most relevant listings as a JSON array.
-
-Each result object must have these exact keys:
-- title: job title string
-- company: company name string
-- location: location string
-- url: direct link to job posting
-- source: which portal (LinkedIn / Indeed / Rozee.pk)
-- description_snippet: short description of the role
-- relevance_score: integer 0-100 (how well it matches the reference description)
-- reason: 1 sentence explaining why this job is relevant
-
-Return ONLY valid JSON. No markdown, no code blocks, no extra text.
-Output format: [{{"title": "...", "company": "...", ...}}, ...]
-"""
-
-    user_message = f"""
-Reference Job Description:
-\"\"\"
-{job_description}
-\"\"\"
-
-Find the top {max_results} most similar jobs available online right now.
-"""
-
-    # Initialize Gemini model with function calling
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        tools=TOOLS,
-        system_instruction=system_prompt,
+    # ── STEP 3: Rank by relevance ─────────────────────────────────────────────
+    print(f"\n[Agent] Step 3: Ranking {len(raw_jobs)} jobs by relevance...")
+    ranked = rank_with_gemini(
+        jobs=raw_jobs,
+        job_role=job_role,
+        job_description=job_description,
+        top_n=max_results,
     )
+    print(f"[Agent] Final ranked results: {len(ranked)}")
 
-    chat = model.start_chat()
-    response = chat.send_message(user_message)
+    # ── Log summary ───────────────────────────────────────────────────────────
+    print("\n[Agent] Results summary:")
+    for i, job in enumerate(ranked, 1):
+        print(f"  {i}. [{job['relevance_score']}%] {job['title']} @ {job['company']} ({job['source']})")
+        print(f"     URL: {job['url']}")
 
-    # Agentic loop — keep calling tools until Gemini finishes
-    max_tool_rounds = 5
-    rounds = 0
-
-    while rounds < max_tool_rounds:
-        rounds += 1
-        tool_calls_made = False
-
-        for candidate in response.candidates:
-            for part in candidate.content.parts:
-                if hasattr(part, "function_call") and part.function_call:
-                    tool_calls_made = True
-                    fn_name = part.function_call.name
-                    fn_args = dict(part.function_call.args)
-
-                    print(f"[Agent] Calling tool: {fn_name}({fn_args})")
-
-                    if fn_name in TOOL_FUNCTIONS:
-                        result = TOOL_FUNCTIONS[fn_name](**fn_args)
-                    else:
-                        result = json.dumps({"error": f"Unknown tool: {fn_name}"})
-
-                    # Send tool result back to Gemini
-                    response = chat.send_message(
-                        genai.protos.Content(
-                            parts=[
-                                genai.protos.Part(
-                                    function_response=genai.protos.FunctionResponse(
-                                        name=fn_name,
-                                        response={"result": result},
-                                    )
-                                )
-                            ]
-                        )
-                    )
-
-        if not tool_calls_made:
-            break  # Gemini has finished — extract final answer
-
-    # Extract the final text response (should be JSON)
-    final_text = ""
-    for candidate in response.candidates:
-        for part in candidate.content.parts:
-            if hasattr(part, "text") and part.text:
-                final_text += part.text
-
-    # Parse JSON from Gemini's response
-    jobs = _parse_jobs_from_response(final_text, max_results)
-    return jobs
-
-
-def _parse_jobs_from_response(text: str, max_results: int) -> list[dict]:
-    """Extract and validate the JSON array from Gemini's final response."""
-    import re
-
-    # Try to find a JSON array in the response
-    text = text.strip()
-
-    # Remove markdown code blocks if present
-    text = re.sub(r"```(?:json)?", "", text).strip()
-    text = text.rstrip("`").strip()
-
-    try:
-        data = json.loads(text)
-        if isinstance(data, list):
-            return _validate_jobs(data[:max_results])
-        if isinstance(data, dict) and "jobs" in data:
-            return _validate_jobs(data["jobs"][:max_results])
-    except json.JSONDecodeError:
-        # Try to extract array from mixed content
-        match = re.search(r"\[.*\]", text, re.DOTALL)
-        if match:
-            try:
-                data = json.loads(match.group())
-                return _validate_jobs(data[:max_results])
-            except Exception:
-                pass
-
-    print(f"[Agent] Could not parse response as JSON. Raw text: {text[:300]}")
-    return []
-
-
-def _validate_jobs(jobs: list) -> list[dict]:
-    """Ensure every job has required fields."""
-    required = ["title", "company", "location", "url", "source",
-                 "description_snippet", "relevance_score", "reason"]
-    validated = []
-    for job in jobs:
-        if not isinstance(job, dict):
-            continue
-        for field in required:
-            if field not in job:
-                job[field] = "N/A" if field != "relevance_score" else 50
-        validated.append(job)
-    return validated
-
-
-def _format_mock_results(mock_jobs: list, max_results: int) -> list[dict]:
-    """Format mock jobs with dummy relevance scores for demo."""
-    import random
-    results = []
-    for i, job in enumerate(mock_jobs[:max_results]):
-        results.append({
-            **job,
-            "relevance_score": random.randint(60, 95),
-            "reason": "Matches your target role and required skills.",
-        })
-    results.sort(key=lambda x: x["relevance_score"], reverse=True)
-    return results
+    return ranked

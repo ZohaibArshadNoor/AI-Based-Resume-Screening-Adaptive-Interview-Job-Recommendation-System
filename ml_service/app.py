@@ -16,8 +16,8 @@ from services.resume_parser import (
 
 from services.skill_extractor import SkillExtractor
 from services.skill_matcher import SkillMatcher
+from services.job_agent import run_job_agent          # ← UNCOMMENTED + FIXED PATH
 
-from services.job_agent import run_job_agent
 from pydantic import BaseModel
 
 import json
@@ -40,8 +40,8 @@ tfidf_vectorizer = joblib.load(VECTORIZER_PATH)
 
 app = FastAPI(
     title="AI Resume Screening ML Service",
-    description="ML microservice for resume parsing and classification",
-    version="1.0.0"
+    description="ML microservice for resume parsing, classification, and job recommendations",
+    version="2.0.0"
 )
 
 
@@ -276,9 +276,9 @@ async def agent_chat(
 # ── Agent: ATS Score ──────────────────────────────────────────────────────────
 @app.post("/agent/ats-score")
 async def agent_ats_score(
-    conversation_json:  str = Form("[]"),   # ← was Form(...) required
-    resume_text:        str = Form(""),     # ← was Form(...) required  
-    job_description:    str = Form(""),     # ← was Form(...) required
+    conversation_json:  str = Form("[]"),
+    resume_text:        str = Form(""),
+    job_description:    str = Form(""),
     resume_skills_json: str = Form("[]"),
     role:               str = Form(""),
 ):
@@ -300,27 +300,35 @@ async def agent_ats_score(
 
     except Exception as e:
         import traceback
-        traceback.print_exc()           # ← prints full error in uvicorn terminal
+        traceback.print_exc()
         return {"error": str(e)}
-    
-    
-# ──────────────────────────────────────────────────────────────────────────────────────
-# ─────────────────────────────────Agent: Job Search────────────────────────────────────
-# ──────────────────────────────────────────────────────────────────────────────────────
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────── Agent: Job Search ────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
 
 class JobSearchRequest(BaseModel):
     job_role: str
     job_description: str
     user_skills: list[str] = []
-    max_results: int = 6
-    use_mock: bool = False
+    max_results: int = 8
 
 
 @app.post("/find-jobs")
 async def find_jobs(req: JobSearchRequest):
     """
-    Gemini agent endpoint.
-    Accepts a job role + description, returns ranked similar job listings.
+    Job Recommendation Agent.
+
+    Accepts:
+      - job_role:        The role the candidate is applying for
+      - job_description: Full text of the job ad they are targeting
+      - user_skills:     Skills extracted from their resume (optional)
+      - max_results:     How many ranked jobs to return (default 8, max 20)
+
+    Returns:
+      Ranked list of real live job listings from LinkedIn, Rozee.pk, and Indeed.
+      Every job includes a direct URL to the actual job posting.
     """
     try:
         jobs = run_job_agent(
@@ -328,9 +336,28 @@ async def find_jobs(req: JobSearchRequest):
             job_description=req.job_description,
             user_skills=req.user_skills,
             max_results=req.max_results,
-            use_mock=req.use_mock,
         )
-        return {"status": "success", "count": len(jobs), "jobs": jobs}
+
+        if not jobs:
+            return {
+                "status": "success",
+                "count": 0,
+                "jobs": [],
+                "message": "No matching jobs found. Try a broader role title."
+            }
+
+        return {
+            "status": "success",
+            "count": len(jobs),
+            "jobs": jobs,
+            "message": f"Found {len(jobs)} relevant jobs from LinkedIn, Rozee.pk, and Indeed."
+        }
+
     except Exception as e:
-        return {"status": "error", "message": str(e), "jobs": []}
-    
+        import traceback
+        traceback.print_exc()
+        return {
+            "status": "error",
+            "message": str(e),
+            "jobs": []
+        }
