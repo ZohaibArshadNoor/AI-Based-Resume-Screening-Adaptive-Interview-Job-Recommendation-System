@@ -12,7 +12,6 @@ export default function Navbar() {
   return (
     <nav className="w-full border-b border-gray-200 bg-white">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-
         {/* LEFT SIDE - BRAND + LINKS */}
         <div className="flex items-center gap-8">
           <h1 className="text-2xl font-bold tracking-tight">
@@ -20,35 +19,21 @@ export default function Navbar() {
           </h1>
 
           <div className="hidden md:flex gap-6 text-sm font-medium">
-            <Link
-              to="/"
-              className="hover:text-gray-600 transition"
-            >
+            <Link to="/" className="hover:text-gray-600 transition">
               Landing
             </Link>
 
-            <Link
-              to="/predict-role"
-              className="hover:text-gray-600 transition"
-            >
+            <Link to="/predict-role" className="hover:text-gray-600 transition">
               Predict Role
             </Link>
 
+            <Link to="/prediction-history">History</Link>
 
-             <Link to="/prediction-history">
-               History
-             </Link>
+            <Link to="/interview-agent">Interview Agent</Link>
 
+            <Link to="/dashboard">Dashboard</Link>
 
-             <Link to="/interview-agent">
-              Interview Agent
-            </Link>
-
-            
-            <Link to="/dashboard">
-              Dashboard
-            </Link>
-
+            <Link to="/jobs">Find Jobs</Link>
           </div>
         </div>
 
@@ -59,7 +44,6 @@ export default function Navbar() {
         >
           Logout
         </button>
-
       </div>
     </nav>
   );

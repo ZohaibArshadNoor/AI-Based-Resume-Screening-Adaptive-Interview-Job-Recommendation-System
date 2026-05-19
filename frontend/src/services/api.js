@@ -7,7 +7,11 @@ const api = axios.create({
 // Attach JWT to every request automatically
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
+
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+
     return config;
 });
 
@@ -18,10 +22,22 @@ api.interceptors.response.use(
         if (error.response?.status === 401) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
+
             window.location.href = '/login';
         }
+
         return Promise.reject(error);
     }
 );
+
+// ================================
+// Job Search API Calls
+// ================================
+
+export const findJobs = (payload) =>
+    api.post('/jobs/find', payload);
+
+export const getJobRecommendations = () =>
+    api.get('/jobs/recommendations');
 
 export default api;

@@ -1,10 +1,12 @@
-const express = require('express');
-const { triggerScrape, getSavedJobs } = require('../controllers/jobController');
-const authMiddleware = require('../middleware/authMiddleware');
+import express from 'express';
 
 const router = express.Router();
 
-router.post('/scrape', authMiddleware, triggerScrape);
-router.get('/recommendations', authMiddleware, getSavedJobs);
+import auth from '../middleware/authMiddleware.js';
+import { findJobs, getRecommendations } from '../controllers/jobController.js';
 
-module.exports = router;
+// Routes
+router.post('/find', auth, findJobs);
+router.get('/recommendations', auth, getRecommendations);
+
+export default router;

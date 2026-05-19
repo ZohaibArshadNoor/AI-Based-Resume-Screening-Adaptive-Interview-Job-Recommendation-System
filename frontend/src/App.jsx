@@ -1,9 +1,4 @@
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -11,6 +6,7 @@ import PredictRole from "./pages/PredictRole";
 import PredictionHistory from "./pages/PredictionHistory";
 import InterviewAgent from "./pages/InterviewAgent";
 import Dashboard from "./pages/Dashboard";
+import JobSearch from "./pages/JobSearch";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
@@ -26,7 +22,6 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
@@ -75,6 +70,14 @@ export default function App() {
           }
         />
 
+        <Route
+          path="/jobs"
+          element={
+            <ProtectedRoute>
+              <JobSearch />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
