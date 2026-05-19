@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import LandingPage from "./pages/LandingPage";
 import PredictRole from "./pages/PredictRole";
 import PredictionHistory from "./pages/PredictionHistory";
 import InterviewAgent from "./pages/InterviewAgent";
@@ -22,11 +23,16 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+
+        {/* PUBLIC */}
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
+
+        {/* PROTECTED */}
         <Route
-          path="/"
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <Dashboard />
@@ -61,15 +67,8 @@ export default function App() {
           }
         />
 
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
 
+  
         <Route
           path="/jobs"
           element={
@@ -78,6 +77,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
       </Routes>
     </BrowserRouter>
   );
